@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'order_history_page.dart';
+import 'analytics_page.dart';
+import 'services/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -106,6 +108,47 @@ class _HomeScreenState extends State<HomeScreen> {
 
   double get total => (subtotal - discountAmount).clamp(0, double.infinity);
 
+  Future<void> _submitOrder() async {
+    if (customerNameController.text.isEmpty || phoneController.text.isEmpty || orderItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required fields')),
+      );
+      return;
+    }
+
+    try {
+      final orderData = {
+        'customer': customerNameController.text.trim(),
+        'phone': phoneController.text.trim(),
+        'items': orderItems,
+        'subtotal': subtotal,
+        'discountType': discountType,
+        'discountValue': double.tryParse(discountController.text) ?? 0.0,
+        'total': total
+      };
+
+      await ApiService.createOrder(orderData);
+
+      // Clear form
+      customerNameController.clear();
+      phoneController.clear();
+      setState(() {
+        orderItems.clear();
+        itemQuantity = 1;
+        discountController.text = '0';
+        discountType = 'percentage';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order created successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creating order: ${e.toString()}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color accentColor = Colors.black;
@@ -158,9 +201,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
               },
               children: [
-                _buildTakeOrderPage(cardBg, accentColor, cardRadius),
+                SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                  child: _buildTakeOrderPage(cardBg, accentColor, cardRadius),
+                ),
                 const OrderHistoryPage(),
-                _buildAnalyticsPage(cardBg, accentColor, cardRadius),
+                const AnalyticsPage(),
               ],
             ),
           ),
@@ -567,7 +613,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         elevation: 2,
                       ),
-                      onPressed: () {},
+                      onPressed: _submitOrder,
                       child: const Text('Place Order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                     ),
                   ),
@@ -577,115 +623,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ],
-    );
-  }
-
-  // --- Analytics Page ---
-  Widget _buildAnalyticsPage(Color cardBg, Color accentColor, BorderRadius cardRadius) {
-    // Dummy analytics data
-    final analytics = [
-      {
-        'label': 'Today',
-        'amount': 79.0,
-        'orders': 1,
-        'avg': 79.0,
-        'topItems': [
-          {'name': 'DBC', 'qty': 1},
-          {'name': 'Coffee', 'qty': 1},
-          {'name': 'Sandwich', 'qty': 1},
-        ],
-      },
-      {
-        'label': 'This Week',
-        'amount': 79.0,
-        'orders': 1,
-        'avg': 79.0,
-        'topItems': [
-          {'name': 'DBC', 'qty': 1},
-          {'name': 'Coffee', 'qty': 1},
-          {'name': 'Sandwich', 'qty': 1},
-        ],
-      },
-      {
-        'label': 'This Month',
-        'amount': 79.0,
-        'orders': 1,
-        'avg': 79.0,
-        'topItems': [
-          {'name': 'DBC', 'qty': 1},
-          {'name': 'Coffee', 'qty': 1},
-          {'name': 'Sandwich', 'qty': 1},
-        ],
-      },
-      {
-        'label': 'This Year',
-        'amount': 79.0,
-        'orders': 1,
-        'avg': 79.0,
-        'topItems': [
-          {'name': 'DBC', 'qty': 1},
-          {'name': 'Coffee', 'qty': 1},
-          {'name': 'Sandwich', 'qty': 1},
-        ],
-      },
-    ];
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Sales Analytics', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-          const SizedBox(height: 18),
-          ...analytics.map((data) => Padding(
-            padding: const EdgeInsets.only(bottom: 18.0),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              color: cardBg,
-              child: Padding(
-                padding: const EdgeInsets.all(22.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(data['label'] as String, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                        const Icon(Icons.calendar_today, size: 20, color: Colors.black),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text('₹${(data['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
-                    const SizedBox(height: 2),
-                    Text('${data['orders']} orders', style: const TextStyle(fontSize: 14, color: Colors.black87)),
-                    Text('Avg: ₹${(data['avg'] as num).toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, color: Colors.black54)),
-                    if (data['topItems'] != null && (data['topItems'] as List).isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      const Divider(height: 1, color: Colors.black12),
-                      const SizedBox(height: 8),
-                      const Text('Top Items', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                      const SizedBox(height: 6),
-                      ...List.generate((data['topItems'] as List).length, (i) {
-                        final item = (data['topItems'] as List)[i] as Map<String, dynamic>;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(item['name'] as String, style: const TextStyle(fontSize: 14)),
-                              Text('x${item['qty']}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          )),
-        ],
-      ),
     );
   }
 } 
